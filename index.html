@@ -279,7 +279,7 @@
     <div class="hero-cta rv d2">
       <a class="btn solid" href="#work">./explore --work</a>
       <a class="btn" href="#contact">./get-in-touch</a>
-      <a class="btn" id="resumeBtn" href="resume.pdf" title="resume">cat resume.pdf</a>
+      <a class="btn" id="resumeBtn" href="resume.pdf" target="_blank" rel="noopener">cat resume.pdf</a>
     </div>
     <div class="scrollhint rv d3"><span class="arw">↓</span> scroll to run the program</div>
   </header>
@@ -696,15 +696,6 @@
     },2600);
     rot.style.transition='opacity .26s';
   }
-
-  // ---------- resume button (placeholder) ----------
-  document.getElementById('resumeBtn').addEventListener('click',(e)=>{
-    // If you add resume.pdf to the repo, set href="resume.pdf" above and delete this handler.
-    if(document.getElementById('resumeBtn').getAttribute('href')==='resume.pdf'){
-      e.preventDefault();
-      alert('Oops something went wrong');
-    }
-  });
 </script>
 </body>
 </html>
