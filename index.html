@@ -82,7 +82,7 @@
 
   /* layout shell */
   main{position:relative;z-index:2;max-width:var(--maxw);margin:0 auto;padding:0 clamp(16px,4vw,28px)}
-  section{padding:clamp(64px,10vh,120px) 0;border-bottom:1px dashed var(--line-soft)}
+  section{padding:clamp(40px,6vh,72px) 0;border-bottom:1px dashed var(--line-soft)}
   section:last-of-type{border-bottom:none}
 
   /* section header as a command */
@@ -130,10 +130,22 @@
   .scrollhint .arw{animation:bob 1.6s ease-in-out infinite}
   @keyframes bob{50%{transform:translateY(5px)}}
 
-  /* reveal */
-  .rv{opacity:0;transform:translateY(26px);transition:opacity .7s cubic-bezier(.2,.7,.2,1),transform .7s cubic-bezier(.2,.7,.2,1)}
-  .rv.in{opacity:1;transform:none}
-  .rv.d1{transition-delay:.06s}.rv.d2{transition-delay:.12s}.rv.d3{transition-delay:.18s}.rv.d4{transition-delay:.24s}
+  /* cinematic reveal: rise + subtle scale, smooth long easing — bidirectional */
+  .rv{
+    opacity:0;
+    transform:translateY(46px) scale(.985);
+    transition:opacity .8s cubic-bezier(.16,.84,.28,1),transform .8s cubic-bezier(.16,.84,.28,1);
+    will-change:opacity,transform;
+  }
+  .rv.in{opacity:1;transform:translateY(0) scale(1)}
+  /* leaving upward past the top: fade + drift up (distinct from the enter-from-below state) */
+  .rv.out-up{opacity:0;transform:translateY(-40px) scale(.99)}
+  /* command headers get a touch less travel */
+  .cmd.rv{transform:translateY(30px) scale(1)}
+  .cmd.rv.out-up{transform:translateY(-26px) scale(1)}
+  @media (prefers-reduced-motion:reduce){
+    .rv{opacity:1 !important;transform:none !important;transition:none !important}
+  }
 
   /* about */
   .about-grid{display:grid;grid-template-columns:1.4fr 1fr;gap:26px}
@@ -240,7 +252,7 @@
 <div id="prog"></div>
 
 <nav id="nav">
-  <div class="brand"><b>naresh</b><span class="at">@</span><b>ai</b><span class="d">:</span><span class="path">~</span><span class="d">$</span></div>
+  <div class="brand"><b>naresh-ai</b><span class="d">:</span><span class="path">~</span><span class="d">$</span></div>
   <div class="navlinks">
     <a href="#whoami"><span class="hash">#</span>whoami</a>
     <a href="#work"><span class="hash">#</span>work</a>
@@ -257,7 +269,7 @@
     <div class="term rv in">
       <div class="term-bar">
         <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
-        <span class="term-title">naresh@ai · zsh · 80×24</span>
+        <span class="term-title">naresh-ai · zsh · 80×24</span>
       </div>
       <div class="term-body" id="typer"></div>
     </div>
@@ -550,7 +562,7 @@
 </main>
 
 <footer>
-  <span class="prompt">naresh@ai:~$</span> echo "built from scratch · hosted on naresh-ai.com" <span class="cursor" style="height:.9em"></span>
+  <span class="prompt">naresh-ai:~$</span> echo "built from scratch · hosted on naresh-ai.com" <span class="cursor" style="height:.9em"></span>
 </footer>
 
 <script>
@@ -563,11 +575,53 @@
   };
   addEventListener('scroll',onScroll,{passive:true}); onScroll();
 
-  // ---------- reveal on scroll ----------
-  const io=new IntersectionObserver((es)=>{
-    es.forEach(e=>{ if(e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target);} });
-  },{threshold:.12,rootMargin:'0px 0px -8% 0px'});
-  document.querySelectorAll('.rv').forEach(el=>{ if(!el.classList.contains('in')) io.observe(el); });
+  // ---------- bidirectional cinematic reveal ----------
+  // enter (from below): .in with header-leads cascade. exit past top: .out-up (fade + drift up).
+  // re-enter while scrolling up: .in again.
+  const reduceMo=matchMedia('(prefers-reduced-motion:reduce)').matches;
+  if(reduceMo){
+    document.querySelectorAll('.rv').forEach(el=>el.classList.add('in'));
+  } else {
+    // assign each .rv a cascade index within its section so enters stay staggered
+    document.querySelectorAll('main > section').forEach(sec=>{
+      const items=[...sec.querySelectorAll('.rv')];
+      items.forEach((el,i)=>{
+        const isHeader=el.classList.contains('cmd');
+        el.dataset.delay = isHeader ? 0 : (90 + i*65);   // ms; header leads, content cascades
+      });
+    });
+    // hero items (not in a section) get no cascade delay
+    document.querySelectorAll('.rv').forEach(el=>{ if(el.dataset.delay===undefined) el.dataset.delay=0; });
+
+    const show=(el)=>{
+      el.style.transitionDelay=((+el.dataset.delay||0)/1000)+'s';
+      el.classList.add('in'); el.classList.remove('out-up');
+    };
+    const hideUp=(el)=>{
+      el.style.transitionDelay='0s';                 // exit immediately, no stagger
+      el.classList.remove('in'); el.classList.add('out-up');
+    };
+    const reset=(el)=>{                              // below viewport again: back to enter-from-below start
+      el.style.transitionDelay='0s';
+      el.classList.remove('in'); el.classList.remove('out-up');
+    };
+
+    const io=new IntersectionObserver((entries)=>{
+      entries.forEach(e=>{
+        const el=e.target;
+        if(e.isIntersecting){
+          show(el);
+        } else {
+          // decide which edge it left by: above top -> out-up; below bottom -> reset
+          const r=e.boundingClientRect;
+          if(r.top < 0) hideUp(el);      // scrolled up past the top edge
+          else reset(el);                // still below the viewport
+        }
+      });
+    },{threshold:0.15, rootMargin:'-8% 0px -12% 0px'});  // enters a bit after arriving, exits near top
+
+    document.querySelectorAll('.rv').forEach(el=>io.observe(el));
+  }
 
   // ---------- count-up ----------
   const cio=new IntersectionObserver((es)=>{
@@ -591,11 +645,11 @@
   const reduce=matchMedia('(prefers-reduced-motion:reduce)').matches;
   const typer=document.getElementById('typer');
   const seq=[
-    {t:'line',html:'<span class="u">naresh</span><span class="at">@</span><span class="u">ai</span><span class="d">:~$</span> <span class="out">whoami</span>'},
+    {t:'line',html:'<span class="u">naresh-ai</span><span class="d">:~$</span> <span class="out">whoami</span>'},
     {t:'out', html:'<span class="out">Naresh R, Forward Deployed Engineer</span>'},
-    {t:'line',html:'<span class="u">naresh</span><span class="at">@</span><span class="u">ai</span><span class="d">:~$</span> <span class="out">cat mission.txt</span>'},
+    {t:'line',html:'<span class="u">naresh-ai</span><span class="d">:~$</span> <span class="out">cat mission.txt</span>'},
     {t:'out', html:'<span class="out">Take AI systems from </span><span class="k">architecture</span><span class="out"> to a client\'s </span><span class="k">on-prem</span><span class="out"> infra , and own them end to end.</span>'},
-    {t:'line',html:'<span class="u">naresh</span><span class="at">@</span><span class="u">ai</span><span class="d">:~$</span> <span class="out">./start --explore</span>'},
+    {t:'line',html:'<span class="u">naresh-ai</span><span class="d">:~$</span> <span class="out">./start --explore</span>'},
   ];
   function typeLine(html,cb){
     // reveal text char-by-char while preserving inline spans
@@ -617,7 +671,7 @@
     if(idx>=seq.length){
       const c=document.createElement('span'); c.className='cursor';
       const last=document.createElement('div'); last.className='ln';
-      last.innerHTML='<span class="u">naresh</span><span class="at">@</span><span class="u">ai</span><span class="d">:~$</span> ';
+      last.innerHTML='<span class="u">naresh-ai</span><span class="d">:~$</span> ';
       last.appendChild(c); typer.appendChild(last);
       // trigger hero text reveals
       document.querySelectorAll('.hero .rv').forEach(el=>el.classList.add('in'));
